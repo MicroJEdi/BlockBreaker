@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+        <meta content="utf-8" http-equiv="encoding">
+        <style>
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            #blockBreakerCanvas {
+                position:fixed;
+                left:0;
+                top:0;
+                width:100%;
+                height:100%;
+            }
+        </style>
+        <script>
+            let blockBreakerCanvas;
+            let blockBreakerCanvasContext;
+            let updateInterval;
+
+            let blocks;
+            let paddle;
+            let ball;
+
+            let gameActive = false;
+            let score = 0;
+            let lives = -1;
+
+            window.onload = () => {
+                blockBreakerCanvas = document.getElementById("blockBreakerCanvas");
+                blockBreakerCanvas.width = window.innerWidth;
+                blockBreakerCanvas.height = window.innerHeight;
+                blockBreakerCanvasContext = blockBreakerCanvas.getContext('2d');
+                document.onkeydown = checkKey;
+                initBoard();
+                drawBoard();
+            }
+            
+            const initBoard = (control) => {
+                initBlocks();
+                initPaddle();
+                initBall();
+            }
+
+            const initBlocks = () => {
+                let colors = ['#FF0000', '#EE9900', '#FFFF00', '#00FF00', '#0000FF', '#FF00FF']
+                blocks = new Array();
+                for(let y=0;y<6;y++) {
+                    blocks[y] = new Array();
+                    for(let x=0;x<10;x++) {
+                        blocks[y].push({ active: true, color: colors[y], x: blockBreakerCanvas.width*0.1*x, y: blockBreakerCanvas.height*0.05*(y+1), width: blockBreakerCanvas.width*0.1, height: blockBreakerCanvas.height*0.05 });
+                    }
+                }
+            }
+
+            const initPaddle = () => {
+                paddle = { color: '#444444', x: blockBreakerCanvas.width*0.425, y: blockBreakerCanvas.height*0.925, height: blockBreakerCanvas.height*0.025, width: blockBreakerCanvas.width*0.15};
+            }
+
+            const initBall = () => {
+                ball = { color: '#000000', x: blockBreakerCanvas.width*0.5, y: blockBreakerCanvas.height*0.5, xVel: -4, yVel: -4, radius: blockBreakerCanvas.width*0.005 };
+            }
+
+            const drawBoard = () => {
+                blockBreakerCanvasContext.clearRect(0, 0, blockBreakerCanvas.width, blockBreakerCanvas.height);
+                drawBlocks();
+                drawPaddle();
+                drawBall();
+                drawStatusText();
+            }
+
+            const drawBlocks = () => {
+                let hasActiveBlocks = false;
+                let hasDestroyedBlock = false;
+                for(let x=0;x<blocks.length;x++) {
+                    for(let y=0;y<blocks[x].length;y++) {
+                        if(blocks[x][y].active) {
+                            hasActiveBlocks = true;
+                            if(!hasDestroyedBlock && blocks[x][y].x <= ball.x+ball.radius && blocks[x][y].y <= ball.y+ball.radius && blocks[x][y].x+blocks[x][y].width >= ball.x-ball.radius && blocks[x][y].y+blocks[x][y].height >= ball.y-ball.radius) {
+                                blocks[x][y].active = false;
+                                hasDestroyedBlock = true;
+                                if(blocks[x][y].x > ball.x || blocks[x][y].x+blocks[x][y].width < ball.x) {
+                                    ball.xVel = -ball.xVel;
+                                }
+                                else {
+                                    ball.yVel = -ball.yVel;
+                                }
+                                score += 10;
+                            }
+                            else {
+                                blockBreakerCanvasContext.fillStyle = blocks[x][y].color;
+                                blockBreakerCanvasContext.fillRect(blocks[x][y].x, blocks[x][y].y, blocks[x][y].width, blocks[x][y].height);
+                            }
+                        }
+                    }
+                }
+                if(hasActiveBlocks == false) {
+                    clearInterval(updateInterval);
+                    gameActive = false;
+                }
+            }
+
+            const drawPaddle = () => {
+                blockBreakerCanvasContext.fillStyle = paddle.color;
+                blockBreakerCanvasContext.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+
+                if(paddle.x <= ball.x+ball.radius && paddle.y <= ball.y+ball.radius && paddle.x+paddle.width >= ball.x-ball.radius && paddle.y+paddle.height >= ball.y-ball.radius) {
+                    if(paddle.x > ball.x || paddle.x+paddle.width < ball.x) {
+                        ball.xVel = -ball.xVel;
+                    }
+                    else {
+                        ball.yVel = -ball.yVel;
+                    }
+                }
+            }
+
+            const drawBall = () => {
+                blockBreakerCanvasContext.fillStyle = ball.color;
+                blockBreakerCanvasContext.beginPath();
+                blockBreakerCanvasContext.ellipse(ball.x, ball.y, ball.radius, ball.radius, 0, 0, Math.PI*2);
+                blockBreakerCanvasContext.fill();
+            }
+
+            const drawStatusText = () => {
+                blockBreakerCanvasContext.font = '16px serif';
+                blockBreakerCanvasContext.fillStyle = '#000000';
+                if(!gameActive && lives >= 0) {
+                    blockBreakerCanvasContext.fillText('Lives: '+lives+'    Score: '+score+'    Press space to resume game', 0, 16);
+                }
+                else if(lives < 0) {
+                    blockBreakerCanvasContext.fillText('Lives: '+lives+'    Score: '+score+'    Press n for new game', 0, 16);
+                }
+                else {
+                    blockBreakerCanvasContext.fillText('Lives: '+lives+'    Score: '+score, 0, 16);
+                }
+            }
+
+            const moveBall = () => {
+                ball.x += ball.xVel;
+                if(ball.x < 0) {
+                    ball.x = 0;
+                    ball.xVel = -ball.xVel;
+                }
+                else if(ball.x > blockBreakerCanvas.width) {
+                    ball.x = blockBreakerCanvas.width;
+                    ball.xVel = -ball.xVel;
+                }
+                ball.y += ball.yVel;
+                if(ball.y < 0) {
+                    ball.y = 0;
+                    ball.yVel = -ball.yVel;
+                }
+                else if(ball.y > blockBreakerCanvas.height) {
+                    clearInterval(updateInterval);
+                    lives -= 1;
+                    gameActive = false;
+                    if(lives >= 0) {
+                        initBall();
+                        initPaddle();
+                    }
+                }
+            }
+
+            const checkKey = (e) => { 
+                e = e || window.event;
+                if (e.keyCode == '37' && paddle.x > 0) {
+                    paddle.x -= 8;
+                }
+                else if (e.keyCode == '39' && paddle.x+paddle.width < blockBreakerCanvas.width) {
+                    paddle.x += 8;
+                }
+                else if (e.keyCode == '32') {
+                    gameActive = !gameActive;
+                    if(gameActive && lives >= 0) {
+                        updateInterval = setInterval(() => {
+                            moveBall();
+                            drawBoard();
+                        }, 1000/30);
+                    }
+                    else {
+                        clearInterval(updateInterval);
+                        drawBoard();
+                    }
+                }
+                else if (e.keyCode == '78') {
+                    clearInterval(updateInterval);
+                    score = 0;
+                    lives = 3;
+                    initBoard();
+                    gameActive = true;
+                    updateInterval = setInterval(() => {
+                        moveBall();
+                        drawBoard();
+                    }, 1000/30);
+                }
+            }
+
+
+        </script>
+    </head>
+    <body>
+        <canvas id="blockBreakerCanvas"></canvas>
+    </body>
+</html>
